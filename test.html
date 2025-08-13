@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Test SEO Tool</title>
+</head>
+<body>
+    <h1>Outil SEO – Test Local</h1>
+    <input type="text" id="siteUrl" placeholder="https://exemple.com" style="width: 300px;">
+    <button id="crawlBtn">Analyser</button>
+
+    <pre id="output" style="background: #eee; padding: 1em;"></pre>
+
+    <script>
+    document.getElementById('crawlBtn').addEventListener('click', async () => {
+        const url = document.getElementById('siteUrl').value.trim();
+        if (!url) return alert("Veuillez entrer une URL");
+
+        try {
+            const res = await fetch("http://localhost:8000/crawl", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    url: url,
+                    max_pages: 3,   // limite pour tester vite
+                    js: false       // mets true si tu veux Playwright
+                })
+            });
+
+            const data = await res.json();
+            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+            console.error(err);
+            alert("Erreur lors de l'appel API");
+        }
+    });
+    </script>
+</body>
+</html>
