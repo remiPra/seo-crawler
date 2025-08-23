@@ -7,15 +7,16 @@ from typing import Optional
 import edge_tts
 import io
 from seo_crawler import crawl as crawl_bs
-from aeo import analyze_aeo_page
 
+# Import AEO
+from aeo import analyze_aeo_page
 
 # Playwright en option si tu en as besoin (inchangé)
 async def crawl_js_lazy(url: str, max_pages: int):
     from seo_crawler_js import crawl_js
     return await crawl_js(url, max_pages)
 
-app = FastAPI(title="SEO Tool (Rules + Scores) + TTS")
+app = FastAPI(title="SEO Tool (Rules + Scores) + TTS + AEO")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,16 +30,14 @@ class Body(BaseModel):
     max_pages: Optional[int] = 60
     js: Optional[bool] = False
 
-# Ajouter ce modèle après vos modèles existants
-class AEORequest(BaseModel):
-    url: HttpUrl
-    use_ai_recommendations: Optional[bool] = True
-
-
-# ========== NOUVEAU MODÈLE TTS ==========
 class SynthesizeRequest(BaseModel):
     text: str
     voice: Optional[str] = "fr-FR-DeniseNeural"
+
+# ========== NOUVEAU MODÈLE AEO ==========
+class AEORequest(BaseModel):
+    url: HttpUrl
+    use_ai_recommendations: Optional[bool] = True
 
 # ========== ENDPOINTS EXISTANTS (inchangés) ==========
 @app.get("/health")
@@ -60,21 +59,7 @@ async def crawl(body: Body):
     except Exception as e:
         raise HTTPException(500, str(e))
 
-
-
-
-
-@app.post("/analyze-aeo")
-async def analyze_aeo(request: AEORequest):
-    """
-    Analyse AEO (Answer Engine Optimization) - SEO pour Perplexity, ChatGPT, Claude
-    """
-    try:
-        result = analyze_aeo_page(str(request.url), request.use_ai_recommendations)
-        return result
-    except Exception as e:
-        raise HTTPException(500, f"Erreur AEO: {str(e)}")
-# ========== NOUVEAUX ENDPOINTS TTS ==========
+# ========== ENDPOINTS TTS ==========
 @app.post("/synthesize")
 async def synthesize(request: SynthesizeRequest):
     """
@@ -145,3 +130,16 @@ async def get_voices():
         return {"voices": french_voices}
     except Exception as e:
         raise HTTPException(500, f"Erreur récupération voix: {str(e)}")
+
+# ========== NOUVEL ENDPOINT AEO ==========
+@app.post("/analyze-aeo")
+async def analyze_aeo(request: AEORequest):
+    """
+    Analyse AEO (Answer Engine Optimization) - SEO pour l'ère de l'IA
+    Optimise pour Perplexity, ChatGPT, Claude, Google SGE
+    """
+    try:
+        result = analyze_aeo_page(str(request.url), request.use_ai_recommendations)
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Erreur analyse AEO: {str(e)}")

@@ -5,6 +5,7 @@ import json
 import re
 import os
 from typing import Dict, Any, List, Optional
+
 try:
     import openai
     openai.api_key = os.getenv("OPENAI_API_KEY", "")
@@ -77,6 +78,8 @@ def analyze_aeo_page(url: str, use_ai: bool = True) -> Dict[str, Any]:
         ai_recs = []
         if use_ai and HAS_OPENAI and openai.api_key:
             ai_recs = _get_ai_recommendations(url, final_score, found, issues[:3])
+        else:
+            ai_recs = _get_fallback_recommendations(found, issues)
         
         return {
             "url": url,
@@ -304,8 +307,26 @@ Format court et actionnable."""
         text = response.choices[0].message.content.strip()
         return [rec.strip() for rec in text.split('\n') if rec.strip() and len(rec) > 10][:3]
         
-    except:
-        return ["Recommandations IA indisponibles"]
+    except Exception as e:
+        return _get_fallback_recommendations(found, issues)
+
+def _get_fallback_recommendations(found: Dict, issues: List[str]) -> List[str]:
+    """Recommandations de secours sans OpenAI"""
+    recs = []
+    
+    if "Dates non structurées" in str(issues):
+        recs.append("Ajouter des dates structurées avec <time datetime='YYYY-MM-DD'>")
+    
+    if found.get('question_headings', 0) < 2:
+        recs.append("Transformer 2-3 H2 en questions directes (Comment, Pourquoi, etc.)")
+    
+    if not found.get('aeo_schemas'):
+        recs.append("Implémenter Schema FAQPage pour vos sections Q/R")
+    
+    if not found.get('file_ai_txt'):
+        recs.append("Créer le fichier /ai.txt pour signaler votre contenu aux IA")
+    
+    return recs[:3] if recs else ["Optimiser le contenu pour l'AEO", "Structurer les données", "Améliorer E-A-T"]
 
 def _get_aeo_grade(score: int) -> str:
     """Grade AEO basé sur le score"""
