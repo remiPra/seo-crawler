@@ -7,6 +7,8 @@ from typing import Optional
 import edge_tts
 import io
 from seo_crawler import crawl as crawl_bs
+from aeo import analyze_aeo_page
+
 
 # Playwright en option si tu en as besoin (inchangé)
 async def crawl_js_lazy(url: str, max_pages: int):
@@ -26,6 +28,12 @@ class Body(BaseModel):
     url: HttpUrl
     max_pages: Optional[int] = 60
     js: Optional[bool] = False
+
+# Ajouter ce modèle après vos modèles existants
+class AEORequest(BaseModel):
+    url: HttpUrl
+    use_ai_recommendations: Optional[bool] = True
+
 
 # ========== NOUVEAU MODÈLE TTS ==========
 class SynthesizeRequest(BaseModel):
@@ -52,6 +60,20 @@ async def crawl(body: Body):
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+
+
+
+@app.post("/analyze-aeo")
+async def analyze_aeo(request: AEORequest):
+    """
+    Analyse AEO (Answer Engine Optimization) - SEO pour Perplexity, ChatGPT, Claude
+    """
+    try:
+        result = analyze_aeo_page(str(request.url), request.use_ai_recommendations)
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Erreur AEO: {str(e)}")
 # ========== NOUVEAUX ENDPOINTS TTS ==========
 @app.post("/synthesize")
 async def synthesize(request: SynthesizeRequest):
