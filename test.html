@@ -2,38 +2,275 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Test SEO Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 SEO Audit Dashboard 2025</title>
+    <!-- Intégration de Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Police Google Fonts pour un look plus pro -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* On garde une seule petite règle pour la police custom */
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body>
-    <h1>Outil SEO – Test Local</h1>
-    <input type="text" id="siteUrl" placeholder="https://exemple.com" style="width: 300px;">
-    <button id="crawlBtn">Analyser</button>
+<body class="bg-slate-50">
 
-    <pre id="output" style="background: #eee; padding: 1em;"></pre>
+    <div class="container mx-auto">
+        <!-- HEADER -->
+        <header class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-8 sm:p-12 text-center">
+            <h1 class="text-3xl sm:text-5xl font-bold mb-3">SEO Audit Dashboard 2025</h1>
+            <p class="text-indigo-200 text-lg max-w-2xl mx-auto">La nouvelle vision de l'audit SEO : la structure d'abord, les recommandations ensuite.</p>
+            <div class="max-w-2xl mx-auto mt-8 flex flex-col sm:flex-row gap-3">
+                <input type="url" id="siteUrl" class="w-full px-5 py-4 text-slate-800 rounded-lg shadow-sm focus:outline-none focus:ring-4 focus:ring-rose-300" placeholder="https://www.monicamariage.com">
+                <input type="number" id="maxPages" class="w-28 px-5 py-4 text-slate-800 rounded-lg shadow-sm focus:outline-none focus:ring-4 focus:ring-rose-300" value="5" min="1" max="50">
+                <button onclick="startAudit()" class="bg-rose-500 hover:bg-rose-600 transition-all font-bold px-8 py-4 rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-1">🔍 Analyser</button>
+            </div>
+        </header>
+
+        <!-- ZONE DE CHARGEMENT -->
+        <div id="loading" class="text-center p-16 hidden">
+            <h3 class="text-2xl font-semibold text-slate-700">🔄 Analyse en cours...</h3>
+            <p class="text-slate-500 mt-2">Notre robot explore le site et effectue plus de 50 tests par page.</p>
+        </div>
+
+        <!-- ZONE DE RÉSULTATS -->
+        <main id="results" class="hidden">
+            <div id="tabs" class="flex border-b border-slate-200 bg-white sticky top-0 z-10">
+                <!-- Les onglets seront générés ici -->
+            </div>
+            <div id="tab-content-container" class="p-4 sm:p-8">
+                <!-- Le contenu des onglets sera généré ici -->
+            </div>
+        </main>
+    </div>
 
     <script>
-    document.getElementById('crawlBtn').addEventListener('click', async () => {
-        const url = document.getElementById('siteUrl').value.trim();
-        if (!url) return alert("Veuillez entrer une URL");
+        async function startAudit() {
+            const url = document.getElementById('siteUrl').value.trim();
+            const maxPages = parseInt(document.getElementById('maxPages').value) || 5;
+            if (!url) { alert('Veuillez entrer une URL'); return; }
 
-        try {
-            const res = await fetch("http://localhost:8000/crawl", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    url: url,
-                    max_pages: 3,   // limite pour tester vite
-                    js: false       // mets true si tu veux Playwright
-                })
-            });
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
 
-            const data = await res.json();
-            document.getElementById('output').textContent = JSON.stringify(data, null, 2);
-        } catch (err) {
-            console.error(err);
-            alert("Erreur lors de l'appel API");
+            try {
+                const response = await fetch('http://localhost:8000/crawl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, max_pages: maxPages })
+                });
+                if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                alert('Erreur lors de l\'analyse : ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
         }
-    });
+
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+            createTabs(data);
+            createTabContents(data);
+            
+            // Activer le premier onglet par défaut
+            switchTab(null, 'overview', document.querySelector('.tab-link'));
+        }
+
+        function createTabs(data) {
+            const tabsContainer = document.getElementById('tabs');
+            let tabsHtml = `<button class="tab-link" onclick="switchTab(event, 'overview', this)">📊 Synthèse Globale</button>`;
+            data.data.forEach((page, index) => {
+                const urlPath = new URL(page.url).pathname;
+                tabsHtml += `<button class="tab-link" onclick="switchTab(event, 'page-${index}', this)">${urlPath === '/' ? 'Homepage' : urlPath}</button>`;
+            });
+            tabsContainer.innerHTML = tabsHtml;
+        }
+
+        function createTabContents(data) {
+            let contentsHtml = renderOverview(data);
+            data.data.forEach((page, index) => {
+                contentsHtml += renderPageDetail(page, index);
+            });
+            document.getElementById('tab-content-container').innerHTML = contentsHtml;
+        }
+
+        function switchTab(event, tabId, element) {
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.add('hidden'));
+            document.querySelectorAll('.tab-link').forEach(tl => tl.classList.remove('active', 'text-indigo-600', 'border-indigo-600'));
+            
+            if (element) {
+                element.classList.add('active', 'text-indigo-600', 'border-indigo-600');
+            }
+            document.getElementById(tabId).classList.remove('hidden');
+        }
+        
+        // --- Fonctions de Rendu avec Tailwind CSS ---
+
+        function renderOverview(data) {
+            const avgScore = data.data.reduce((sum, page) => sum + page.score_global, 0) / data.data.length;
+            const criticalErrors = data.data.flatMap(p => p.recommendations).filter(r => r.severity === 'error');
+            const pagesHtml = data.data.map(page => `
+                <div class="flex justify-between items-center p-3 rounded-md hover:bg-slate-100">
+                    <a href="${page.url}" target="_blank" class="font-medium text-indigo-600 truncate">${new URL(page.url).pathname}</a>
+                    <span class="font-bold text-sm text-white px-3 py-1 rounded-full ${getScoreClass(page.score_global)}">${page.score_global}</span>
+                </div>
+            `).join('');
+
+            return `
+                <div id="overview" class="tab-content animate-fadeIn">
+                    <h2 class="text-3xl font-bold mb-6 text-slate-800">Synthèse de l'Audit</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-md">
+                            <h3 class="text-lg font-semibold mb-3 text-slate-600">Score Global Moyen</h3>
+                            <div class="text-center">
+                                <p class="text-6xl font-bold text-indigo-600">${avgScore.toFixed(0)}<span class="text-3xl text-slate-400">/100</span></p>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-md">
+                            <h3 class="text-lg font-semibold mb-3 text-slate-600">Pages Analysées (${data.pages})</h3>
+                            <div class="space-y-2">${pagesHtml}</div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-md">
+                            <h3 class="text-lg font-semibold mb-3 text-slate-600">Erreurs Critiques (${criticalErrors.length})</h3>
+                            <ul class="space-y-2 text-sm text-red-700 list-disc list-inside">${criticalErrors.slice(0, 5).map(e => `<li>${e.message}</li>`).join('') || '<li>Aucune erreur critique. Bravo !</li>'}</ul>
+                        </div>
+                    </div>
+                </div>`;
+        }
+        
+        function renderPageDetail(page, index) {
+            const data = page.extracted_data || { title: 'N/A', meta_description: 'N/A', canonical: 'N/A', headings: [] };
+            const headingsHtml = data.headings.length > 0 ? data.headings.map(h => `
+                <div class="hn-${h.level} text-slate-800 font-medium py-2 px-3 rounded-md
+                            ${h.level === 1 ? 'ml-0 pl-3 text-lg font-bold border-l-4 border-indigo-500 bg-indigo-50' : ''}
+                            ${h.level === 2 ? 'ml-4 pl-3 text-base border-l-4 border-cyan-500 bg-cyan-50' : ''}
+                            ${h.level === 3 ? 'ml-8 pl-3 text-sm border-l-4 border-teal-500 bg-teal-50' : ''}
+                            ${h.level >= 4 ? 'ml-12 pl-3 text-sm border-l-4 border-slate-400 bg-slate-50' : ''}">
+                    ${h.text}
+                </div>
+            `).join('') : '<p class="text-slate-500">Aucun titre trouvé sur cette page.</p>';
+            
+            const recsBySeverity = { error: [], warn: [], success: [], info: [] };
+            page.recommendations.forEach(r => {
+                if (r.severity === 'error') recsBySeverity.error.push(r);
+                else if (r.severity === 'warn') recsBySeverity.warn.push(r);
+                else if (r.message.toLowerCase().includes('excellent') || r.message.toLowerCase().includes('parfaitement') || r.message.toLowerCase().includes('bon ')) recsBySeverity.success.push(r);
+                else recsBySeverity.info.push(r);
+            });
+            
+            const recommendationsHtml = (title, recs, icon, type) => recs.length === 0 ? '' : `
+                <div class="mt-6">
+                    <h3 class="text-xl font-semibold mb-3 flex items-center gap-2 text-slate-700">${icon} ${title} <span class="text-sm font-medium bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">${recs.length}</span></h3>
+                    <div class="space-y-3">${recs.map(r => `
+                        <div class="p-4 rounded-lg flex items-start gap-4 ${getRecClass(type)}">
+                            <div class="text-xl mt-1">${getRecIcon(type)}</div>
+                            <div>
+                                <strong class="font-semibold text-slate-800">${r.message}</strong>
+                                <p class="text-xs text-slate-500 mt-1">ID: ${r.rule_id} | Catégorie: ${r.topic}</p>
+                            </div>
+                        </div>
+                    `).join('')}</div>
+                </div>
+            `;
+
+            return `
+                <div id="page-${index}" class="tab-content hidden animate-fadeIn">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Colonne de Gauche : Structure de la Page -->
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow-md">
+                                <h3 class="text-xl font-semibold mb-4 text-slate-700">🏷️ Meta Éléments</h3>
+                                <div class="space-y-4 text-sm">
+                                    <div><p class="font-semibold text-slate-500">Titre</p><p class="font-mono text-slate-800">${data.title}</p></div>
+                                    <div><p class="font-semibold text-slate-500">Meta Description</p><p class="font-mono text-slate-800">${data.meta_description}</p></div>
+                                    <div><p class="font-semibold text-slate-500">URL Canonique</p><p class="font-mono text-slate-800">${data.canonical}</p></div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md">
+                                <h3 class="text-xl font-semibold mb-4 text-slate-700">📝 Structure des Titres (Hn)</h3>
+                                <div class="space-y-2">${headingsHtml}</div>
+                            </div>
+                        </div>
+                        <!-- Colonne de Droite : Analyse & Scores -->
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl shadow-md">
+                                <h3 class="text-xl font-semibold mb-4 text-slate-700">🎯 Scores de la Page</h3>
+                                <div class="grid grid-cols-3 text-center">
+                                    <div><p class="text-5xl font-bold text-indigo-600">${page.score_global}</p><p class="font-semibold text-slate-500">Global</p></div>
+                                    <div><p class="text-5xl font-bold text-slate-700">${page.score_legacy}</p><p class="font-semibold text-slate-500">SEO Classique</p></div>
+                                    <div><p class="text-5xl font-bold text-slate-700">${page.score_rules}</p><p class="font-semibold text-slate-500">Règles 2025</p></div>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md">
+                                <h3 class="text-xl font-semibold text-slate-700">💡 Recommandations</h3>
+                                ${recommendationsHtml('Erreurs Critiques', recsBySeverity.error, '❌', 'error')}
+                                ${recommendationsHtml('Avertissements', recsBySeverity.warn, '⚠️', 'warn')}
+                                ${recommendationsHtml('Points Forts', recsBySeverity.success, '✅', 'success')}
+                                ${recommendationsHtml('Informations', recsBySeverity.info, '💡', 'info')}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // --- Fonctions Utilitaires avec Classes Tailwind ---
+        function getScoreClass(score) {
+            if (score >= 90) return 'bg-green-500';
+            if (score >= 70) return 'bg-sky-500';
+            if (score >= 50) return 'bg-amber-500';
+            return 'bg-red-500';
+        }
+
+        function getRecClass(type) {
+            const classes = {
+                error: 'bg-red-50 border-l-4 border-red-400',
+                warn: 'bg-amber-50 border-l-4 border-amber-400',
+                success: 'bg-green-50 border-l-4 border-green-400',
+                info: 'bg-sky-50 border-l-4 border-sky-400'
+            };
+            return classes[type] || 'bg-slate-100';
+        }
+
+        function getRecIcon(type) {
+            const icons = { error: '❌', warn: '⚠️', success: '✅', info: '💡' };
+            return icons[type] || '📋';
+        }
+
+        document.getElementById('siteUrl').addEventListener('keypress', e => e.key === 'Enter' && startAudit());
+
+        // CSS pour les onglets actifs (ne peut pas être fait purement en Tailwind sans JS)
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .tab-link {
+                padding: 1rem 1.5rem;
+                cursor: pointer;
+                border-bottom: 4px solid transparent;
+                font-weight: 600;
+                color: #64748b; /* text-slate-500 */
+                transition: all 0.2s;
+            }
+            .tab-link:hover {
+                color: #4f46e5; /* text-indigo-600 */
+                background-color: #f8fafc; /* bg-slate-50 */
+            }
+            .tab-link.active {
+                color: #4f46e5; /* text-indigo-600 */
+                border-bottom-color: #4f46e5; /* border-indigo-600 */
+            }
+            .animate-fadeIn {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+
     </script>
 </body>
 </html>
