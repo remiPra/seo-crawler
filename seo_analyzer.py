@@ -243,5 +243,7 @@ def analyze_seo_page(url: str) -> Dict[str, Any]:
         "url": url,
         "success": True,
         "overall_score": int(final_score),
-        "results": all_checks
+        "results": all_checks,
+        "raw_html": html_content  # <--- C'EST LA SEULE LIGNE À AJOUTER !
+
     }
