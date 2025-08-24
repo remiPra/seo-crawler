@@ -11,6 +11,8 @@ from deepseek_analyzer import analyze_ai_optimization_complete
 
 # Import AEO
 from aeo import analyze_aeo_page
+from seo_analyzer import analyze_seo_page
+
 
 # Playwright en option si tu en as besoin (inchangé)
 async def crawl_js_lazy(url: str, max_pages: int):
@@ -30,6 +32,13 @@ class Body(BaseModel):
     url: HttpUrl
     max_pages: Optional[int] = 60
     js: Optional[bool] = False
+
+
+
+# --- NOUVEAU MODÈLE Pydantic ---
+class SEORequest(BaseModel):
+    url: HttpUrl
+
 
 class SynthesizeRequest(BaseModel):
     text: str
@@ -51,6 +60,25 @@ class AEORequest(BaseModel):
 def health():
     return {"ok": True}
 
+
+
+
+# --- NOUVEL ENDPOINT SEO ---
+@app.post("/analyze-seo")
+async def analyze_seo(request: SEORequest):
+    """
+    🚀 Analyse SEO technique complète d'une page
+    
+    Audit basé sur plus de 20 points de contrôle (structure, metas, contenu, images, etc.)
+    """
+    try:
+        result = analyze_seo_page(str(request.url))
+        if not result.get("success"):
+            raise HTTPException(400, result.get("error", "Erreur lors de l'analyse SEO"))
+        return result
+    except Exception as e:
+        # Cette capture est plus générale pour les erreurs inattendues
+        raise HTTPException(500, f"Erreur interne du serveur lors de l'analyse SEO: {str(e)}")
 
 
 # ========== NOUVEL ENDPOINT DEEPSEEK ==========
