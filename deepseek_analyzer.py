@@ -2,14 +2,13 @@
 import os
 import requests
 from openai import OpenAI
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment # Importation de Comment
 from typing import Dict, Any, Optional
 import json
-# deepseek_analyzer.py - Ajouter au début (ligne 1-2)
 from dotenv import load_dotenv
-load_dotenv()  # Charge le fichier .env
 
-
+# Charge le fichier .env
+load_dotenv()  
 
 def get_html_content(url: str) -> Optional[str]:
     """Récupère le HTML complet d'une page"""
@@ -46,7 +45,6 @@ def check_ai_files(base_url: str) -> Dict[str, Any]:
                     'exists': True,
                     'content_preview': response.text[:200] + "..." if len(response.text) > 200 else response.text
                 }
-                # Analyse spéciale pour robots.txt
                 if filename == 'robots.txt':
                     ai_bots = ['GPTBot', 'PerplexityBot', 'Claude-Web', 'Google-Extended', 'CCBot']
                     bot_status = {}
@@ -67,31 +65,53 @@ def check_ai_files(base_url: str) -> Dict[str, Any]:
     return results
 
 def analyze_with_deepseek(html_content: str, ai_files_check: Dict[str, Any], url: str) -> Optional[str]:
-    """Analyse complète d'optimisation IA avec DeepSeek V3"""
+    """Analyse complète d'optimisation IA avec DeepSeek V3, incluant nettoyage et troncature intelligente."""
     
-    # Vérifier la clé API
     api_key = os.getenv('DEEPSEEK_API_KEY')
     if not api_key:
         raise Exception("DEEPSEEK_API_KEY non configurée dans les variables d'environnement")
     
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.deepseek.com"
-    )
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
     
-    # Parser le HTML pour analyse préliminaire
+    # --- SECTION DE NETTOYAGE ET TRONCATURE INTELLIGENTE ---
+
+    # 1. Parser le HTML une seule fois avec BeautifulSoup
+    print("🧹 Nettoyage du HTML...")
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Extraire quelques infos clés pour le prompt
+    # 2. Enlever les balises inutiles pour l'analyse de contenu (scripts, styles, svg)
+    for element in soup(["script", "style", "svg"]):
+        element.decompose()
+        
+    # 3. Enlever les commentaires HTML qui peuvent être longs et inutiles
+    for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+        comment.extract()
+        
+    # 4. Récupérer le HTML nettoyé. prettify() le rend plus lisible pour l'IA.
+    cleaned_html = soup.prettify()
+    print(f"🧼 HTML nettoyé, taille réduite à {len(cleaned_html):,} caractères.")
+
+    # 5. Appliquer une troncature de sécurité sur le HTML *nettoyé* pour respecter la limite du modèle
+    MAX_CHARS = 115000  # Limite de sécurité (32k tokens * ~3.5 chars/token)
+    
+    if len(cleaned_html) > MAX_CHARS:
+        html_to_analyze = cleaned_html[:MAX_CHARS] + "\n\n<!-- NOTE POUR L'IA: Le contenu HTML a été nettoyé puis tronqué car il dépassait la taille maximale d'analyse. L'audit se base sur le début du document. -->"
+        print(f"✂️  HTML tronqué à {MAX_CHARS} caractères car il restait trop volumineux.")
+    else:
+        html_to_analyze = cleaned_html
+
+    # --- FIN DE LA SECTION DE NETTOYAGE ---
+    
+    # Extraire quelques infos clés pour le prompt à partir de l'objet 'soup' déjà créé
     title = soup.find('title')
-    title_text = title.get_text() if title else "Pas de titre"
+    title_text = title.get_text().strip() if title else "Pas de titre"
     
     meta_desc = soup.find('meta', attrs={'name': 'description'})
-    meta_desc_text = meta_desc.get('content') if meta_desc else "Pas de meta description"
+    meta_desc_text = meta_desc.get('content', "Pas de meta description").strip()
     
     h1_tags = soup.find_all('h1')
     h1_count = len(h1_tags)
-    h1_text = [h1.get_text().strip() for h1 in h1_tags]
+    h1_text = [h1.get_text(strip=True) for h1 in h1_tags]
     
     prompt = f"""
 AUDIT SPÉCIALISÉ : OPTIMISATION POUR IA (Perplexity, ChatGPT, Claude, Gemini)
@@ -169,19 +189,17 @@ Pour chaque section, donne :
 - Top 3 des points forts pour les IA
 - Top 5 des améliorations prioritaires pour être mieux référencé par Perplexity/ChatGPT/Claude
 
-HTML à analyser (extrait) :
-{html_content[:20000]}
+HTML à analyser (nettoyé et potentiellement tronqué) :
+{html_to_analyze}
 """
     
     try:
         print("🤖 DeepSeek V3 analyse l'optimisation IA...")
         response = client.chat.completions.create(
             model="deepseek-chat",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=5000
+            max_tokens=4096 # Augmenté légèrement pour des rapports plus détaillés si besoin
         )
         
         return response.choices[0].message.content
@@ -193,11 +211,9 @@ HTML à analyser (extrait) :
 def analyze_ai_optimization_complete(url: str) -> Dict[str, Any]:
     """Fonction principale d'analyse complète"""
     try:
-        # Étape 1 : Vérifier les fichiers IA
-        base_url = '/'.join(url.split('/')[:3])  # https://domain.com
+        base_url = '/'.join(url.split('/')[:3])
         ai_files_check = check_ai_files(base_url)
         
-        # Étape 2 : Récupérer le HTML
         html_content = get_html_content(url)
         
         if not html_content:
@@ -207,7 +223,6 @@ def analyze_ai_optimization_complete(url: str) -> Dict[str, Any]:
                 "success": False
             }
         
-        # Étape 3 : Analyse avec DeepSeek
         ai_report = analyze_with_deepseek(html_content, ai_files_check, url)
         
         return {
