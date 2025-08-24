@@ -7,6 +7,7 @@ from typing import Optional
 import edge_tts
 import io
 from seo_crawler import crawl as crawl_bs
+from deepseek_analyzer import analyze_ai_optimization_complete
 
 # Import AEO
 from aeo import analyze_aeo_page
@@ -34,6 +35,12 @@ class SynthesizeRequest(BaseModel):
     text: str
     voice: Optional[str] = "fr-FR-DeniseNeural"
 
+
+# ========== NOUVEAU MODÈlE DEEPSEEK ==========
+class DeepSeekAIRequest(BaseModel):
+    url: HttpUrl
+
+
 # ========== NOUVEAU MODÈLE AEO ==========
 class AEORequest(BaseModel):
     url: HttpUrl
@@ -43,6 +50,35 @@ class AEORequest(BaseModel):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+
+# ========== NOUVEL ENDPOINT DEEPSEEK ==========
+@app.post("/analyze-ai-deepseek")
+async def analyze_ai_deepseek(request: DeepSeekAIRequest):
+    """
+    🤖 Analyse optimisation IA avec DeepSeek V3
+    
+    Audit complet pour optimiser votre site pour :
+    - Perplexity AI
+    - ChatGPT / OpenAI
+    - Claude / Anthropic  
+    - Google SGE (Search Generative Experience)
+    - Autres moteurs de réponse IA
+    """
+    try:
+        result = analyze_ai_optimization_complete(str(request.url))
+        
+        if not result.get("success"):
+            raise HTTPException(500, result.get("error", "Erreur inconnue"))
+            
+        return result
+        
+    except Exception as e:
+        raise HTTPException(500, f"Erreur analyse DeepSeek: {str(e)}")
+
+
+
 
 @app.post("/crawl")
 async def crawl(body: Body):

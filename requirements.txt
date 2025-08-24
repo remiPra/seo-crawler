@@ -7,3 +7,5 @@ playwright
 edge-tts
 aiofiles
 pydantic
+openai
+python-dotenv
