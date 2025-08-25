@@ -24,7 +24,7 @@ async def analyze_lcp_page(url: str, strategy: str = "mobile") -> dict:
             
             # Navigue et attend 30s que le rapport charge (JS async)
             await page.goto(psi_url)
-            await page.wait_for_timeout(30000)  # 30 secondes, ajuste si besoin (plus long pour sites lents)
+            await page.wait_for_timeout(300000)  # 30 secondes, ajuste si besoin (plus long pour sites lents)
             
             # Récupère le HTML rendu
             html = await page.content()
