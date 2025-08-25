@@ -44,6 +44,14 @@ class Body(BaseModel):
 class SEORequest(BaseModel):
     url: HttpUrl
 
+# Nouveau modèle pour Playwright
+class PlaywrightTestRequest(BaseModel):
+    url: Optional[HttpUrl] = "https://httpbin.org/json"
+    action: Optional[str] = "basic"  # "basic", "screenshot", "content"
+
+
+
+
 class SynthesizeRequest(BaseModel):
     text: str
     voice: Optional[str] = "fr-FR-DeniseNeural"
@@ -61,6 +69,60 @@ class AEORequest(BaseModel):
 class LCPRequest(BaseModel):
     url: HttpUrl
     strategy: Optional[str] = "mobile"  # "mobile" ou "desktop"
+
+@app.post("/test-playwright")
+async def test_playwright(request: PlaywrightTestRequest):
+    """
+    🎭 Test Playwright - Vérifiez que tout fonctionne parfaitement !
+    
+    Actions disponibles:
+    - basic: Test simple avec infos de la page
+    - screenshot: Capture d'écran en base64
+    - content: Extraction de contenu complet
+    """
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.newPage()
+            
+            # Navigation
+            await page.goto(str(request.url), wait_until="networkidle")
+            
+            result = {
+                "success": True,
+                "url": str(request.url),
+                "action": request.action,
+                "playwright_status": "✅ Fonctionne parfaitement !"
+            }
+            
+            if request.action == "basic":
+                result.update({
+                    "title": await page.title(),
+                    "viewport": page.viewport_size,
+                    "user_agent": await page.evaluate("navigator.userAgent")
+                })
+                
+            elif request.action == "screenshot":
+                screenshot = await page.screenshot(type="png", full_page=True)
+                result["screenshot_base64"] = base64.b64encode(screenshot).decode()
+                result["screenshot_size"] = len(screenshot)
+                
+            elif request.action == "content":
+                result.update({
+                    "title": await page.title(),
+                    "html_length": len(await page.content()),
+                    "links_count": len(await page.locator("a").all()),
+                    "images_count": len(await page.locator("img").all())
+                })
+            
+            await browser.close()
+            return result
+            
+    except Exception as e:
+        raise HTTPException(500, f"Erreur Playwright: {str(e)}")
+
+
+
 
 # ========== ENDPOINTS EXISTANTS (inchangés) ==========
 @app.get("/health")
