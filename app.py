@@ -8,7 +8,8 @@ import edge_tts
 import io
 from seo_crawler import crawl as crawl_bs
 from deepseek_analyzer import analyze_ai_optimization_complete
-
+from playwright.async_api import async_playwright
+import base64
 # Import AEO
 from aeo import analyze_aeo_page
 from seo_analyzer import analyze_seo_page
