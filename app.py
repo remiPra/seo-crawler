@@ -13,6 +13,13 @@ from deepseek_analyzer import analyze_ai_optimization_complete
 from aeo import analyze_aeo_page
 from seo_analyzer import analyze_seo_page
 
+# Imports pour le nouveau endpoint LCP
+import requests
+from dotenv import load_dotenv
+import os
+
+# Charge les env vars (pour clé API PSI optionnelle)
+load_dotenv()
 
 # Playwright en option si tu en as besoin (inchangé)
 async def crawl_js_lazy(url: str, max_pages: int):
@@ -33,35 +40,32 @@ class Body(BaseModel):
     max_pages: Optional[int] = 60
     js: Optional[bool] = False
 
-
-
 # --- NOUVEAU MODÈLE Pydantic ---
 class SEORequest(BaseModel):
     url: HttpUrl
-
 
 class SynthesizeRequest(BaseModel):
     text: str
     voice: Optional[str] = "fr-FR-DeniseNeural"
 
-
 # ========== NOUVEAU MODÈlE DEEPSEEK ==========
 class DeepSeekAIRequest(BaseModel):
     url: HttpUrl
-
 
 # ========== NOUVEAU MODÈLE AEO ==========
 class AEORequest(BaseModel):
     url: HttpUrl
     use_ai_recommendations: Optional[bool] = True
 
+# ========== NOUVEAU MODÈLE POUR LCP ==========
+class LCPRequest(BaseModel):
+    url: HttpUrl
+    strategy: Optional[str] = "mobile"  # "mobile" ou "desktop"
+
 # ========== ENDPOINTS EXISTANTS (inchangés) ==========
 @app.get("/health")
 def health():
     return {"ok": True}
-
-
-
 
 # --- NOUVEL ENDPOINT SEO ---
 @app.post("/analyze-seo")
@@ -79,7 +83,6 @@ async def analyze_seo(request: SEORequest):
     except Exception as e:
         # Cette capture est plus générale pour les erreurs inattendues
         raise HTTPException(500, f"Erreur interne du serveur lors de l'analyse SEO: {str(e)}")
-
 
 # ========== NOUVEL ENDPOINT DEEPSEEK ==========
 @app.post("/analyze-ai-deepseek")
@@ -104,9 +107,6 @@ async def analyze_ai_deepseek(request: DeepSeekAIRequest):
         
     except Exception as e:
         raise HTTPException(500, f"Erreur analyse DeepSeek: {str(e)}")
-
-
-
 
 @app.post("/crawl")
 async def crawl(body: Body):
@@ -207,3 +207,74 @@ async def analyze_aeo(request: AEORequest):
         return result
     except Exception as e:
         raise HTTPException(500, f"Erreur analyse AEO: {str(e)}")
+
+# # ========== NOUVEL ENDPOINT LCP ==========
+# @app.post("/analyze-lcp")
+# async def analyze_lcp(request: LCPRequest):
+#     """
+#     ⚡ Analyse LCP (Largest Contentful Paint) via PageSpeed Insights
+    
+#     Vérifie un Core Web Vital clé pour la perf SEO (mobile/desktop).
+#     Retourne la valeur en ms + un score simple.
+#     """
+#     try:
+#         result = analyze_lcp_page(str(request.url), request.strategy)
+
+
+# ========== NOUVEL ENDPOINT LCP (ajouté ici) ==========
+@app.post("/analyze-lcp")
+async def analyze_lcp(request: LCPRequest):
+    """
+    ⚡ Analyse LCP (Largest Contentful Paint) via PageSpeed Insights
+    
+    Vérifie un Core Web Vital clé pour la perf SEO (mobile/desktop).
+    Retourne la valeur en ms + un score simple.
+    """
+    api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+    params = {
+        "url": str(request.url),
+        "strategy": request.strategy,  # mobile ou desktop
+        "category": "performance"  # Focus sur perf
+    }
+    
+    # Ajoute la clé API si dispo dans .env
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if api_key:
+        params["key"] = api_key
+    
+    try:
+        response = requests.get(api_url, params=params, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Extrait LCP
+        lcp_audit = data.get("lighthouseResult", {}).get("audits", {}).get("largest-contentful-paint")
+        if not lcp_audit:
+            raise ValueError("LCP non trouvé dans la réponse PSI")
+        
+        lcp_value = lcp_audit.get("numericValue")  # En ms
+        lcp_unit = lcp_audit.get("numericUnit", "millisecond")
+        
+        # Score simple
+        if lcp_value < 2500:
+            score = "Bon (rapide !)"
+        elif lcp_value < 4000:
+            score = "Moyen (améliorable)"
+        else:
+            score = "Mauvais (optimise tes images/fontes !)"
+        
+        return {
+            "url": str(request.url),
+            "strategy": request.strategy,
+            "lcp": f"{lcp_value} {lcp_unit}",
+            "score": score,
+            "full_data": lcp_audit  # Détails optionnels
+        }
+    
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Erreur API PSI: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur interne lors de l'analyse LCP: {str(e)}")
