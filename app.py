@@ -12,7 +12,7 @@ from deepseek_analyzer import analyze_ai_optimization_complete
 # Import AEO
 from aeo import analyze_aeo_page
 from seo_analyzer import analyze_seo_page
-
+from analyze_lcp import analyze_lcp_page  # Assure-toi que c'est async
 # Imports pour le nouveau endpoint LCP
 import requests
 from dotenv import load_dotenv
@@ -222,8 +222,24 @@ async def analyze_aeo(request: AEORequest):
 
 
 # ========== NOUVEL ENDPOINT LCP (ajouté ici) ==========
+# ========== NOUVEL ENDPOINT LCP ==========
 @app.post("/analyze-lcp")
 async def analyze_lcp(request: LCPRequest):
+    """
+    ⚡ Analyse LCP (Largest Contentful Paint) via scraping PageSpeed Insights
+    
+    Utilise Playwright pour charger et parser le rapport (attente ~30s).
+    Retourne la valeur + score simple.
+    """
+    try:
+        result = await analyze_lcp_page(str(request.url), request.strategy)
+        
+        if not result.get("success"):
+            raise HTTPException(400, result.get("error", "Erreur lors de l'analyse LCP"))
+        
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Erreur interne lors de l'analyse LCP: {str(e)}")
     """
     ⚡ Analyse LCP (Largest Contentful Paint) via PageSpeed Insights
     
